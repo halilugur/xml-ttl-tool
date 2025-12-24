@@ -9,4 +9,4 @@ A browser-based tool for mapping XML structures to Turtle (TTL) vocabularies vis
 - **Export:** One-click JSON export of your mappings.
 
 ## Live Demo
-[Click here to use the tool](https://<your-username>.github.io/semantic-mapper/)
+[Click here to use the tool](https://halilugur.github.io/xml-ttl-tool/)
