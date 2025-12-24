@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semantic Mapper: XML to TTL</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script src="https://unpkg.com/n3@1.17.1/browser/n3.min.js"></script>
+
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --bg-panel: #1e293b;
+            --bg-input: #334155;
+            --border-color: #475569;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+
+            --accent-primary: #6366f1;
+            --accent-hover: #4f46e5;
+            --accent-xml: #ec4899;
+            --accent-ttl: #10b981;
+
+            --radius: 8px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+
+            --scroll-track: #0f172a;
+            --scroll-thumb: #475569;
+            --scroll-thumb-hover: #64748b;
+        }
+
+        * { box-sizing: border-box; outline: none; }
+
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--scroll-track);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--scroll-thumb);
+            border-radius: 10px;
+            border: 2px solid var(--scroll-track);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: var(--scroll-thumb-hover);
+        }
+
+        ::-webkit-scrollbar-corner {
+            background: var(--scroll-track);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            height: 60px;
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: var(--bg-panel);
+            z-index: 10;
+        }
+
+        .brand {
+            font-weight: 600;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand i { color: var(--accent-primary); }
+
+        .header-actions button {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-actions button:hover { background: var(--border-color); }
+        .header-actions button.primary { background: var(--accent-primary); border-color: var(--accent-primary); }
+        .header-actions button.primary:hover { background: var(--accent-hover); }
+
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr;
+            flex: 1;
+            overflow: hidden;
+            gap: 1px;
+            background: var(--border-color);
+        }
+
+        .column {
+            background: var(--bg-body);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .col-header {
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(30, 41, 59, 0.95);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .col-header .badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--bg-input);
+        }
+
+        .editor-container {
+            padding: 16px;
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-panel);
+        }
+
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 16px;
+            min-height: 0;
+        }
+
+        textarea, input {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid transparent;
+            color: var(--text-primary);
+            border-radius: var(--radius);
+            padding: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            resize: none;
+            transition: border 0.2s;
+        }
+
+        textarea:focus, input:focus { border-color: var(--accent-primary); }
+        .search-bar { margin-bottom: 10px; }
+
+        .draggable-item {
+            cursor: grab;
+            padding: 6px 10px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .draggable-item:hover {
+            border-color: var(--text-secondary);
+            transform: translateX(2px);
+            background: #253045;
+        }
+
+        .draggable-item:active { cursor: grabbing; }
+
+        .xml-node details { margin-left: 10px; }
+        .xml-node summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 4px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .xml-node summary:hover { color: var(--text-primary); }
+        .xml-node summary::before {
+            content: '\f0da';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            width: 14px;
+            transition: transform 0.2s;
+        }
+        .xml-node details[open] > summary::before { transform: rotate(90deg); }
+        .xml-leaf { border-left: 3px solid var(--accent-xml); }
+
+        .ttl-item { border-left: 3px solid var(--accent-ttl); }
+
+        #mappingArea { padding-bottom: 100px; }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 40px;
+            font-size: 14px;
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 40px;
+        }
+        .empty-state i { font-size: 24px; margin-bottom: 10px; display: block; }
+
+        .mapping-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 10px 14px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+        }
+        .btn-delete:hover { color: #ef4444; }
+
+        .card-body { padding: 14px; }
+
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius);
+            padding: 12px;
+            min-height: 50px;
+            background: rgba(15, 23, 42, 0.5);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: var(--accent-ttl);
+            background: rgba(16, 185, 129, 0.1);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+        }
+
+        .drop-zone-placeholder {
+            width: 100%;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .mapped-tag {
+            background: var(--bg-input);
+            border: 1px solid var(--accent-ttl);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mapped-tag i { cursor: pointer; color: var(--text-secondary); }
+        .mapped-tag i:hover { color: #ef4444; }
+
+        .comment-box {
+            margin-top: 10px;
+            background: var(--bg-body);
+            border-color: var(--border-color);
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+        }
+        .comment-box:focus { color: var(--text-primary); }
+
+        #jsonOverlay {
+            position: fixed;
+            bottom: -300px;
+            left: 0;
+            right: 0;
+            height: 250px;
+            background: var(--bg-panel);
+            border-top: 2px solid var(--accent-primary);
+            z-index: 100;
+            transition: bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -10px 25px rgba(0,0,0,0.5);
+        }
+        #jsonOverlay.open { bottom: 0; }
+
+        .json-header {
+            padding: 10px 20px;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #mappingOutput {
+            flex: 1;
+            margin: 0;
+            padding: 20px;
+            overflow: auto;
+            color: #a5b4fc;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            border-left: 4px solid var(--accent-primary);
+            box-shadow: var(--shadow);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+            font-size: 13px;
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <i class="fa-solid fa-diagram-project"></i>
+        Semantic Mapper
+    </div>
+    <div class="header-actions">
+        <button onclick="toggleJson()"><i class="fa-solid fa-code"></i> View JSON</button>
+        <button class="primary" onclick="copyJson()"><i class="fa-regular fa-copy"></i> Copy Mapping</button>
+    </div>
+</header>
+
+<main>
+    <div class="column">
+        <div class="col-header">
+            <span><i class="fa-regular fa-file-code me-2"></i> Source XML</span>
+            <span class="badge">Drag Source</span>
+        </div>
+        <div class="editor-container">
+            <textarea id="xmlInput" rows="5" placeholder="Paste XML source here..."></textarea>
+        </div>
+        <div id="xmlFields" class="scroll-area">
+            <div class="empty-state" style="border:none; padding: 20px;">
+                <i class="fa-solid fa-arrow-up"></i>
+                Paste XML above to parse structure
+            </div>
+        </div>
+    </div>
+
+    <div class="column" style="background: #182030;">
+        <div class="col-header">
+            <span><i class="fa-solid fa-arrows-left-right me-2"></i> Mappings</span>
+            <span class="badge" id="mapCount">0 Mappings</span>
+        </div>
+        <div id="mappingArea" class="scroll-area">
+            <div class="empty-state">
+                <i class="fa-regular fa-hand-point-up"></i>
+                <div>Drag a field from <strong>XML</strong> here to start mapping</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="column">
+        <div class="col-header">
+            <span><i class="fa-solid fa-database me-2"></i> Target Vocab (TTL)</span>
+            <span class="badge">Drag Target</span>
+        </div>
+        <div class="editor-container">
+            <input id="ttlSearch" class="search-bar" placeholder="Filter predicates/classes...">
+            <textarea id="ttlInput" rows="5" placeholder="Paste TTL/Ontology here..."></textarea>
+        </div>
+        <div id="ttlFields" class="scroll-area"></div>
+    </div>
+</main>
+
+<div id="jsonOverlay">
+    <div class="json-header">
+        <span style="font-weight:600; font-size: 13px;">Generated Mapping JSON</span>
+        <button class="btn-delete" onclick="toggleJson()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <pre id="mappingOutput"></pre>
+</div>
+
+<div id="toast" class="toast">Action Successful</div>
+
+<script>
+    const mappings = {};
+
+    // DOM Elements
+    const els = {
+        xmlInput: document.getElementById('xmlInput'),
+        xmlFields: document.getElementById('xmlFields'),
+        ttlInput: document.getElementById('ttlInput'),
+        ttlSearch: document.getElementById('ttlSearch'),
+        ttlFields: document.getElementById('ttlFields'),
+        mappingArea: document.getElementById('mappingArea'),
+        mappingOutput: document.getElementById('mappingOutput'),
+        jsonOverlay: document.getElementById('jsonOverlay'),
+        mapCount: document.getElementById('mapCount'),
+        toast: document.getElementById('toast')
+    };
+
+    // --- Utils ---
+    function showToast(msg, type = 'success') {
+        els.toast.textContent = msg;
+        els.toast.style.borderLeftColor = type === 'error' ? '#ef4444' : '#6366f1';
+        els.toast.classList.add('show');
+        setTimeout(() => els.toast.classList.remove('show'), 3000);
+    }
+
+    function toggleJson() {
+        els.jsonOverlay.classList.toggle('open');
+        updateOutput();
+    }
+
+    function copyJson() {
+        updateOutput();
+        navigator.clipboard.writeText(JSON.stringify(mappings, null, 2));
+        showToast('JSON copied to clipboard');
+    }
+
+    // --- XML Handling ---
+    els.xmlInput.addEventListener("input", debounce(() => {
+        els.xmlFields.innerHTML = "";
+        if (!els.xmlInput.value.trim()) return;
+
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(els.xmlInput.value, "application/xml");
+            if (doc.getElementsByTagName("parsererror").length > 0) throw new Error();
+
+            renderXml(doc.documentElement, els.xmlFields, "");
+        } catch {
+            els.xmlFields.innerHTML = `<div class="empty-state" style="color:#ef4444; border-color:#ef4444"><i class="fa-solid fa-triangle-exclamation"></i>Invalid XML Syntax</div>`;
+        }
+    }, 300));
+
+    function renderXml(node, container, path) {
+        const fullPath = path ? path + "/" + node.nodeName : "/" + node.nodeName;
+        const isLeaf = node.children.length === 0;
+
+        if (isLeaf) {
+            const div = document.createElement("div");
+            div.className = "draggable-item xml-leaf";
+            div.draggable = true;
+            div.innerHTML = `<i class="fa-solid fa-tag"></i> <span>${node.nodeName}</span>`;
+            div.title = fullPath;
+            div.addEventListener("dragstart", e => {
+                e.dataTransfer.setData("type", "source");
+                e.dataTransfer.setData("path", fullPath);
+                e.dataTransfer.effectAllowed = "copy";
+            });
+            container.appendChild(div);
+            return;
+        }
+
+        const details = document.createElement("details");
+        details.open = true;
+        const summary = document.createElement("summary");
+        summary.innerHTML = `<i class="fa-regular fa-folder"></i> ${node.nodeName}`;
+
+        details.appendChild(summary);
+        const childrenContainer = document.createElement("div");
+        childrenContainer.className = "xml-node";
+        [...node.children].forEach(c => renderXml(c, childrenContainer, fullPath));
+        details.appendChild(childrenContainer);
+        container.appendChild(details);
+    }
+
+    // --- TTL Handling ---
+    els.ttlInput.addEventListener("input", debounce(renderTtl, 500));
+    els.ttlSearch.addEventListener("input", debounce(renderTtl, 200));
+
+    function renderTtl() {
+        els.ttlFields.innerHTML = "";
+        if (!els.ttlInput.value.trim()) return;
+
+        try {
+            const parser = new N3.Parser();
+            const quads = parser.parse(els.ttlInput.value);
+            const iris = new Set();
+
+            quads.forEach(q => {
+                if (q.subject.termType === "NamedNode") iris.add(q.subject.value);
+                if (q.predicate.termType === "NamedNode") iris.add(q.predicate.value);
+            });
+
+            const search = els.ttlSearch.value.toLowerCase();
+            const list = [...iris].sort();
+
+            if(list.length === 0) {
+                els.ttlFields.innerHTML = `<div class="empty-state" style="border:none"><i class="fa-solid fa-ghost"></i>No IRIs found</div>`;
+                return;
+            }
+
+            list.filter(i => i.toLowerCase().includes(search))
+                .forEach(iri => {
+                    const shortName = iri.split('#').pop().split('/').pop();
+                    const div = document.createElement("div");
+                    div.className = "draggable-item ttl-item";
+                    div.draggable = true;
+                    div.innerHTML = `<i class="fa-solid fa-cube"></i> <span style="word-break:break-all">${shortName}</span> <br><small style="color:var(--text-secondary); font-size:10px">${iri}</small>`;
+                    div.addEventListener("dragstart", e => {
+                        e.dataTransfer.setData("type", "target");
+                        e.dataTransfer.setData("iri", iri);
+                    });
+                    els.ttlFields.appendChild(div);
+                });
+        } catch (e) {
+            els.ttlFields.innerHTML = `<div class="empty-state" style="color:#ef4444; border-color:#ef4444"><i class="fa-solid fa-bug"></i>Parse Error</div>`;
+        }
+    }
+
+    // --- Mapping Logic ---
+    els.mappingArea.addEventListener("dragover", e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+    });
+
+    els.mappingArea.addEventListener("drop", e => {
+        e.preventDefault();
+        const type = e.dataTransfer.getData("type");
+        if (type !== "source") return;
+
+        const path = e.dataTransfer.getData("path");
+        if (!mappings[path]) {
+            mappings[path] = { targets: [], comment: "" };
+            renderMappings();
+            showToast(`Created mapping for ${path}`);
+        } else {
+            showToast('Mapping already exists', 'error');
+        }
+    });
+
+    function renderMappings() {
+        const keys = Object.keys(mappings);
+        els.mapCount.textContent = `${keys.length} Mappings`;
+
+        if (keys.length === 0) {
+            els.mappingArea.innerHTML = `
+                <div class="empty-state">
+                    <i class="fa-regular fa-hand-point-up"></i>
+                    <div>Drag a field from <strong>XML</strong> here to start mapping</div>
+                </div>`;
+            updateOutput();
+            return;
+        }
+
+        els.mappingArea.innerHTML = "";
+
+        keys.forEach(path => {
+            const data = mappings[path];
+            const card = document.createElement("div");
+            card.className = "mapping-card";
+
+            const header = document.createElement("div");
+            header.className = "card-header";
+            header.innerHTML = `
+                    <span><i class="fa-solid fa-code-branch"></i> ${path}</span>
+                    <button class="btn-delete" title="Remove Mapping"><i class="fa-solid fa-trash"></i></button>
+                `;
+            header.querySelector('.btn-delete').onclick = () => {
+                delete mappings[path];
+                renderMappings();
+            };
+
+            const body = document.createElement("div");
+            body.className = "card-body";
+
+            const dropZone = document.createElement("div");
+            dropZone.className = "drop-zone";
+
+            if (data.targets.length === 0) {
+                dropZone.innerHTML = `<div class="drop-zone-placeholder"><i class="fa-solid fa-plus-circle"></i> Drop TTL predicates here</div>`;
+            } else {
+                data.targets.forEach((t, idx) => {
+                    const chip = document.createElement("div");
+                    chip.className = "mapped-tag";
+                    const name = t.split('#').pop().split('/').pop();
+                    chip.innerHTML = `<span>${name}</span> <i class="fa-solid fa-xmark"></i>`;
+                    chip.querySelector('i').onclick = (e) => {
+                        e.stopPropagation();
+                        data.targets.splice(idx, 1);
+                        renderMappings();
+                    };
+                    chip.title = t;
+                    dropZone.appendChild(chip);
+                });
+            }
+
+            dropZone.addEventListener("dragover", e => {
+                e.preventDefault();
+                if(e.dataTransfer.types.includes("text/plain")) return;
+                dropZone.classList.add("drag-over");
+            });
+            dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+            dropZone.addEventListener("drop", e => {
+                e.preventDefault();
+                dropZone.classList.remove("drag-over");
+
+                const type = e.dataTransfer.getData("type");
+                if (type !== "target") return;
+
+                const iri = e.dataTransfer.getData("iri");
+                if (!data.targets.includes(iri)) {
+                    data.targets.push(iri);
+                    renderMappings();
+                    showToast("Target mapped");
+                }
+            });
+
+            const comment = document.createElement("textarea");
+            comment.className = "comment-box";
+            comment.rows = 1;
+            comment.placeholder = "Add a comment...";
+            comment.value = data.comment;
+            comment.addEventListener("input", e => {
+                data.comment = e.target.value;
+                updateOutput();
+            });
+
+            body.appendChild(dropZone);
+            body.appendChild(comment);
+            card.appendChild(header);
+            card.appendChild(body);
+
+            els.mappingArea.appendChild(card);
+        });
+        updateOutput();
+    }
+
+    function updateOutput() {
+        els.mappingOutput.textContent = JSON.stringify(mappings, null, 2);
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    // Init Data
+    els.xmlInput.value = `<person id="123">\n    <name>John Doe</name>\n    <contact>\n        <email>john@example.com</email>\n    </contact>\n</person>`;
+    els.xmlInput.dispatchEvent(new Event('input'));
+
+    els.ttlInput.value = `@prefix schema: <http://schema.org/> .\n@prefix foaf: <http://xmlns.com/foaf/0.1/> .\n\nschema:Person a schema:Class .\nschema:name a schema:Property .\nschema:email a schema:Property .`;
+    els.ttlInput.dispatchEvent(new Event('input'));
+</script>
+</body>
+</html>
